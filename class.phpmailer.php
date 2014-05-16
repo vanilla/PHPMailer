@@ -556,6 +556,12 @@ class PHPMailer
      */
     const STOP_CRITICAL = 2;
 
+
+   /**
+    * Error severity; message is fine, but the server din't accept the message.
+    */
+   const STOP_SERVER = 5;
+
     /**
      * SMTP RFC standard line ending
      */
@@ -1083,7 +1089,7 @@ class PHPMailer
         if ($this->SingleTo === true) {
             foreach ($this->SingleToArray as $val) {
                 if (!@$mail = popen($sendmail, 'w')) {
-                    throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_CRITICAL);
+                    throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_SERVER);
                 }
                 fputs($mail, 'To: ' . $val . "\n");
                 fputs($mail, $header);
@@ -1093,12 +1099,12 @@ class PHPMailer
                 $isSent = ($result == 0) ? 1 : 0;
                 $this->doCallback($isSent, $val, $this->cc, $this->bcc, $this->Subject, $body, $this->From);
                 if ($result != 0) {
-                    throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_CRITICAL);
+                    throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_SERVER);
                 }
             }
         } else {
             if (!@$mail = popen($sendmail, 'w')) {
-                throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_CRITICAL);
+                throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_SERVER);
             }
             fputs($mail, $header);
             fputs($mail, $body);
@@ -1107,7 +1113,7 @@ class PHPMailer
             $isSent = ($result == 0) ? 1 : 0;
             $this->doCallback($isSent, $this->to, $this->cc, $this->bcc, $this->Subject, $body, $this->From);
             if ($result != 0) {
-                throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_CRITICAL);
+                throw new phpmailerException($this->lang('execute') . $this->Sendmail, self::STOP_SERVER);
             }
         }
         return true;
@@ -1192,7 +1198,7 @@ class PHPMailer
         $bad_rcpt = array();
 
         if (!$this->smtpConnect()) {
-            throw new phpmailerException($this->lang('smtp_connect_failed'), self::STOP_CRITICAL);
+            throw new phpmailerException($this->lang('smtp_connect_failed'), self::STOP_SERVER);
         }
         $smtp_from = ($this->Sender == '') ? $this->From : $this->Sender;
         if (!$this->smtp->mail($smtp_from)) {
@@ -1231,7 +1237,7 @@ class PHPMailer
 
         //Only send the DATA command if we have viable recipients
         if ((count($this->all_recipients) > count($bad_rcpt)) and !$this->smtp->data($header . $body)) {
-            throw new phpmailerException($this->lang('data_not_accepted'), self::STOP_CRITICAL);
+            throw new phpmailerException($this->lang('data_not_accepted'), self::STOP_SERVER);
         }
         if ($this->SMTPKeepAlive == true) {
             $this->smtp->reset();
@@ -1312,7 +1318,7 @@ class PHPMailer
 
                     if ($tls) {
                         if (!$this->smtp->startTLS()) {
-                            throw new phpmailerException($this->lang('connect_host'));
+                            throw new phpmailerException($this->lang('connect_host'), self::STOP_SERVER);
                         }
                         //We must resend HELO after tls negotiation
                         $this->smtp->hello($hello);
@@ -2034,6 +2040,15 @@ class PHPMailer
     {
         return $value . $this->LE;
     }
+
+
+   public function ThrowExceptions($NewValue = NULL)
+   {
+       if ($NewValue !== NULL) {
+           $this->exceptions = $NewValue;
+       }
+       return $this->exceptions;
+   }
 
     /**
      * Add an attachment from a path on the filesystem.
@@ -3395,6 +3410,10 @@ class PHPMailer
             $params = array($isSent, $to, $cc, $bcc, $subject, $body, $from);
             call_user_func_array($this->action_function, $params);
         }
+    }
+
+    public function CountRecipients() {
+        return count($this->to) + count($this->cc) + count($this->bcc);
     }
 }
 
